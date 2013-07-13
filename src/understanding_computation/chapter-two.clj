@@ -65,7 +65,7 @@
   (reduce [assign env]
     (let [{:keys [name expression]} assign]
       (if (reducable? expression)
-        {:statement (Assign. name (reduce expression env)) :env env}
+        {:statement (SAssign. name (reduce expression env)) :env env}
         {:statement (SDoNothing.) :env (assoc env name expression)}))))
 
 (defrecord SIf [condition consequence alternative]
@@ -82,6 +82,18 @@
                                :env env}
        (= condition (SBoolean. true)) {:statement consequence :env env}
        (= condition (SBoolean. false)) {:statement alternative :env env}))))
+
+(defrecord SSequence [first second]
+  Statement
+  (reducable? [_] true)
+  Reducable
+  (reduce [s env]
+    (if (= (:first s) (SDoNothing.))
+      {:statement (:second s)
+       :env env}
+      (let [{:keys [statement env]} (reduce (:first s) env)]
+        {:statement (SSequence. statement (:second s))
+         :env env}))))
 
 (defrecord SMachine [statement env])
 
@@ -141,3 +153,8 @@
   (.write writer " } else { ")
   (clojure.core/print-method (:alternative sif) writer)
   (.write writer " }"))
+
+(defmethod clojure.core/print-method SSequence [s writer]
+  (clojure.core/print-method (:first s) writer)
+  (.write writer "; ")
+  (clojure.core/print-method (:second s) writer))
