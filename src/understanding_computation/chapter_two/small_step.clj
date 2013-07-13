@@ -1,4 +1,4 @@
-(ns understanding-computation.chapter-two)
+(ns understanding-computation.chapter-two.small-step)
 
 (defprotocol Statement
   (reducable? [e]))
