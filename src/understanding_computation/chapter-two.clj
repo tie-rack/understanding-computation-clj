@@ -95,6 +95,16 @@
         {:statement (SSequence. statement (:second s))
          :env env}))))
 
+(defrecord SWhile [condition body]
+  Statement
+  (reducable? [_] true)
+  Reducable
+  (reduce [swhile env]
+    {:statement (SIf. (:condition swhile)
+                      (SSequence. (:body swhile) swhile)
+                      (SDoNothing.))
+     :env env}))
+
 (defrecord SMachine [statement env])
 
 (defn step [machine]
@@ -158,3 +168,10 @@
   (clojure.core/print-method (:first s) writer)
   (.write writer "; ")
   (clojure.core/print-method (:second s) writer))
+
+(defmethod clojure.core/print-method SWhile [swhile writer]
+  (.write writer "while (")
+  (clojure.core/print-method (:condition swhile) writer)
+  (.write writer ") { ")
+  (clojure.core/print-method (:body swhile) writer)
+  (.write writer " }"))
