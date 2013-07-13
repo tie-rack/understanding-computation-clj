@@ -54,11 +54,11 @@
   (reduce [e env]
     ((:name e) env)))
 
-(defrecord DoNothing []
+(defrecord SDoNothing []
   Statement
   (reducable? [_] false))
 
-(defrecord Assign [name expression]
+(defrecord SAssign [name expression]
   Statement
   (reducable? [_] true)
   Reducable
@@ -66,7 +66,22 @@
     (let [{:keys [name expression]} assign]
       (if (reducable? expression)
         {:statement (Assign. name (reduce expression env)) :env env}
-        {:statement (DoNothing.) :env (assoc env name expression)}))))
+        {:statement (SDoNothing.) :env (assoc env name expression)}))))
+
+(defrecord SIf [condition consequence alternative]
+  Statement
+  (reducable? [_] true)
+  Reducable
+  (reduce [sif env]
+    (let [{:keys [condition consequence alternative]} sif]
+      (cond
+       (reducable? condition) {:statement
+                               (SIf. (reduce condition env)
+                                     consequence
+                                     alternative)
+                               :env env}
+       (= condition (SBoolean. true)) {:statement consequence :env env}
+       (= condition (SBoolean. false)) {:statement alternative :env env}))))
 
 (defrecord SMachine [statement env])
 
@@ -110,10 +125,19 @@
 (defmethod clojure.core/print-method SVariable [v writer]
   (.write writer (str "«" (:name v) "»")))
 
-(defmethod clojure.core/print-method DoNothing [v writer]
+(defmethod clojure.core/print-method SDoNothing [v writer]
   (.write writer "«do-nothing»"))
 
-(defmethod clojure.core/print-method Assign [a writer]
+(defmethod clojure.core/print-method SAssign [a writer]
   (.write writer (str "«" (:name a) " = "))
   (clojure.core/print-method (:expression a) writer)
   (.write writer "»"))
+
+(defmethod clojure.core/print-method SIf [sif writer]
+  (.write writer "if (")
+  (clojure.core/print-method (:condition sif) writer)
+  (.write writer ") { ")
+  (clojure.core/print-method (:consequence sif) writer)
+  (.write writer " } else { ")
+  (clojure.core/print-method (:alternative sif) writer)
+  (.write writer " }"))
