@@ -1,6 +1,6 @@
 (ns understanding-computation.chapter-two)
 
-(defprotocol SExpression
+(defprotocol Statement
   (reducable? [e]))
 
 (defprotocol Reducable
@@ -9,56 +9,80 @@
 (defn- reduce-binary-expr-fn [self-constructor value-constructor operator]
   (fn [expression env]
     (cond
-     (reducable? (:left expression)) (self-constructor (reduce (:left expression) env) (:right expression))
-     (reducable? (:right expression)) (self-constructor (:left expression) (reduce (:right expression) env))
-     :else (value-constructor (operator (:value (:left expression)) (:value (:right expression)))))))
+     (reducable? (:left expression)) (self-constructor
+                                      (reduce (:left expression) env)
+                                      (:right expression))
+     (reducable? (:right expression)) (self-constructor
+                                       (:left expression)
+                                       (reduce (:right expression) env))
+     :else (value-constructor (operator (:value (:left expression))
+                                        (:value (:right expression)))))))
 
 (defrecord SBoolean [value]
-  SExpression
+  Statement
   (reducable? [_] false))
 
 (defrecord SNumber [value]
-  SExpression
+  Statement
   (reducable? [_] false))
 
 (defrecord SAdd [left right]
-  SExpression
+  Statement
   (reducable? [_] true)
   Reducable
   (reduce [e env]
     ((reduce-binary-expr-fn ->SAdd ->SNumber +) e env)))
 
 (defrecord SMultiply [left right]
-  SExpression
+  Statement
   (reducable? [_] true)
   Reducable
   (reduce [e env]
     ((reduce-binary-expr-fn ->SMultiply ->SNumber *) e env)))
 
 (defrecord SLessThan [left right]
-  SExpression
+  Statement
   (reducable? [_] true)
   Reducable
   (reduce [e env]
     ((reduce-binary-expr-fn ->SLessThan ->SBoolean <) e env)))
 
 (defrecord SVariable [name]
-  SExpression
+  Statement
   (reducable? [_] true)
   Reducable
   (reduce [e env]
     ((:name e) env)))
 
-(defrecord SMachine [expression env])
+(defrecord DoNothing []
+  Statement
+  (reducable? [_] false))
+
+(defrecord Assign [name expression]
+  Statement
+  (reducable? [_] true)
+  Reducable
+  (reduce [assign env]
+    (let [{:keys [name expression]} assign]
+      (if (reducable? expression)
+        {:statement (Assign. name (reduce expression env)) :env env}
+        {:statement (DoNothing.) :env (assoc env name expression)}))))
+
+(defrecord SMachine [statement env])
 
 (defn step [machine]
-  (SMachine. (reduce (:expression machine) (:env machine)) (:env machine)))
+  (let [{:keys [statement env]} (reduce
+                                 (:statement machine)
+                                 (:env machine))]
+    (SMachine. statement env)))
 
 (defn run [machine]
   (loop [m machine]
-    (print (:expression m))
+    (print (:statement m))
+    (print ", ")
+    (print (:env m))
     (print "\n")
-    (if (reducable? (:expression m))
+    (if (reducable? (:statement m))
       (recur (step m)))))
 
 ;;; Printing
@@ -85,3 +109,11 @@
 
 (defmethod clojure.core/print-method SVariable [v writer]
   (.write writer (str "«" (:name v) "»")))
+
+(defmethod clojure.core/print-method DoNothing [v writer]
+  (.write writer "«do-nothing»"))
+
+(defmethod clojure.core/print-method Assign [a writer]
+  (.write writer (str "«" (:name a) " = "))
+  (clojure.core/print-method (:expression a) writer)
+  (.write writer "»"))
