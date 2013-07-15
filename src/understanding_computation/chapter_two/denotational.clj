@@ -1,4 +1,5 @@
-(ns understanding-computation.chapter-two.denotational)
+(ns understanding-computation.chapter-two.denotational
+  (:require [instaparse.core :as insta]))
 
 (defprotocol Clojureable
   (to-clojure [clojureable]))
@@ -122,3 +123,43 @@
   (.write writer ") { ")
   (clojure.core/print-method (:body swhile) writer)
   (.write writer " }"))
+
+(def parser
+  (insta/parser
+"program = statement
+statement = assign | if | while
+while = <'while('> expr <') {'> statement <'}'>
+assign = name <'='> expr
+number = #'[0-9]+'
+name = #'[a-z]+'
+if = <'if('> expr <') then {'> statement <'} else {'> statement <'}'>
+expr = lt | add | mult
+add = term <'+'> term
+mult = term <'*'> term
+lt = term <'<'> term
+term = vname | number
+vname = #'[a-z]+'
+"))
+
+(def transforms
+  {:number #(SNumber. (read-string %))
+   :name keyword
+   :assign #(SAssign. % %2)
+   :statement identity
+   :if #(SIf. % %2 %3)
+   :while #(SWhile. % %2)
+   :term identity
+   :lt #(SLessThan. % %2)
+   :add #(SAdd. % %2)
+   :mult #(SMultiply. % %2)
+   :expr identity
+   :program identity
+   :vname #(SVariable. (keyword %))})
+
+(defn parse-and-execute [program env]
+  (let [ast (insta/transform transforms (parser program))]
+    (execute ast env)))
+
+(comment
+  (parse-and-execute "if(x<3) then {y=1} else {y=2}" {:x 4})
+  (parse-and-execute "while(x<5) {x=x*3}" {:x 1}))
