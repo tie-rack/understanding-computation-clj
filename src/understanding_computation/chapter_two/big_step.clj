@@ -59,6 +59,18 @@
        (= (SBoolean. true) test) (evaluate consequence env)
        (= (SBoolean. false) test) (evaluate alternative env)))))
 
+(defrecord SSequence [first second]
+  Evalable
+  (evaluate [sseq env]
+    (evaluate (:second sseq) (evaluate (:first sseq) env))))
+
+(defrecord SWhile [condition body]
+  Evalable
+  (evaluate [swhile env]
+    (if (= (SBoolean. true) (evaluate (:condition swhile) env))
+      (recur (evaluate (:body swhile) env))
+      env)))
+
 ;;; Printing
 (defn- print-binary-epxr [operator]
   (fn [expression writer]
@@ -84,8 +96,8 @@
 (defmethod clojure.core/print-method SVariable [v writer]
   (.write writer (str "«" (:name v) "»")))
 
-;; (defmethod clojure.core/print-method SDoNothing [v writer]
-;;   (.write writer "«do-nothing»"))
+(defmethod clojure.core/print-method SDoNothing [v writer]
+  (.write writer "«do-nothing»"))
 
 (defmethod clojure.core/print-method SAssign [a writer]
   (.write writer (str "«" (:name a) " = "))
@@ -101,14 +113,14 @@
   (clojure.core/print-method (:alternative sif) writer)
   (.write writer " }"))
 
-;; (defmethod clojure.core/print-method SSequence [s writer]
-;;   (clojure.core/print-method (:first s) writer)
-;;   (.write writer "; ")
-;;   (clojure.core/print-method (:second s) writer))
+(defmethod clojure.core/print-method SSequence [s writer]
+  (clojure.core/print-method (:first s) writer)
+  (.write writer "; ")
+  (clojure.core/print-method (:second s) writer))
 
-;; (defmethod clojure.core/print-method SWhile [swhile writer]
-;;   (.write writer "while (")
-;;   (clojure.core/print-method (:condition swhile) writer)
-;;   (.write writer ") { ")
-;;   (clojure.core/print-method (:body swhile) writer)
-;;   (.write writer " }"))
+(defmethod clojure.core/print-method SWhile [swhile writer]
+  (.write writer "while (")
+  (clojure.core/print-method (:condition swhile) writer)
+  (.write writer ") { ")
+  (clojure.core/print-method (:body swhile) writer)
+  (.write writer " }"))
