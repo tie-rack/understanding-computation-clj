@@ -16,12 +16,58 @@
   (to-clojure [v]
     `(fn [env#] (env# (:name ~v)))))
 
+(defn binary-op-to-clojure [binary-form op]
+  `(fn [env#]
+     (~op (execute (:l ~binary-form) env#)
+          (execute (:r ~binary-form) env#))))
+
 (defrecord SAdd [l r]
   Clojureable
   (to-clojure [a]
+    (binary-op-to-clojure a +)))
+
+(defrecord SMultiply [l r]
+  Clojureable
+  (to-clojure [m]
+    (binary-op-to-clojure m *)))
+
+(defrecord SLessThan [l r]
+  Clojureable
+  (to-clojure [lt]
+    (binary-op-to-clojure lt <)))
+
+(defrecord SAssign [name expr]
+  Clojureable
+  (to-clojure [a]
     `(fn [env#]
-       (+ (execute (:l ~a) env#)
-          (execute (:r ~a) env#)))))
+       (assoc env# (:name ~a) (execute (:expr ~a) env#)))))
+
+(defrecord SDoNothing []
+  Clojureable
+  (to-clojure [_]
+    identity))
+
+(defrecord SIf [condition consequence alternative]
+  Clojureable
+  (to-clojure [sif]
+    `(fn [env#]
+       (if (execute (:condition ~sif) env#)
+         (execute (:consequence ~sif) env#)
+         (execute (:alternative ~sif) env#)))))
+
+(defrecord SSequence [first second]
+  Clojureable
+  (to-clojure [sseq]
+    `(fn [env#]
+       (execute (:second ~sseq) (execute (:first ~sseq) env#)))))
+
+(defrecord SWhile [condition body]
+  Clojureable
+  (to-clojure [swhile]
+    `(fn [env#]
+       (if (execute (:condition ~swhile) env#)
+         (recur (execute (:body ~swhile) env#))
+         (execute (SDoNothing.) env#)))))
 
 ;; Printing
 (defn- print-binary-epxr [operator]
@@ -39,40 +85,40 @@
 (defmethod clojure.core/print-method SAdd [expression writer]
   ((print-binary-epxr "+") expression writer))
 
-;; (defmethod clojure.core/print-method SMultiply [expression writer]
-;;   ((print-binary-epxr "*") expression writer))
+(defmethod clojure.core/print-method SMultiply [expression writer]
+  ((print-binary-epxr "*") expression writer))
 
-;; (defmethod clojure.core/print-method SLessThan [expression writer]
-;;   ((print-binary-epxr "<") expression writer))
+(defmethod clojure.core/print-method SLessThan [expression writer]
+  ((print-binary-epxr "<") expression writer))
 
 (defmethod clojure.core/print-method SVariable [v writer]
   (.write writer (str "«" (:name v) "»")))
 
-;; (defmethod clojure.core/print-method SDoNothing [v writer]
-;;   (.write writer "«do-nothing»"))
+(defmethod clojure.core/print-method SDoNothing [v writer]
+  (.write writer "«do-nothing»"))
 
-;; (defmethod clojure.core/print-method SAssign [a writer]
-;;   (.write writer (str "«" (:name a) " = "))
-;;   (clojure.core/print-method (:expr a) writer)
-;;   (.write writer "»"))
+(defmethod clojure.core/print-method SAssign [a writer]
+  (.write writer (str "«" (:name a) " = "))
+  (clojure.core/print-method (:expr a) writer)
+  (.write writer "»"))
 
-;; (defmethod clojure.core/print-method SIf [sif writer]
-;;   (.write writer "if (")
-;;   (clojure.core/print-method (:condition sif) writer)
-;;   (.write writer ") { ")
-;;   (clojure.core/print-method (:consequence sif) writer)
-;;   (.write writer " } else { ")
-;;   (clojure.core/print-method (:alternative sif) writer)
-;;   (.write writer " }"))
+(defmethod clojure.core/print-method SIf [sif writer]
+  (.write writer "if (")
+  (clojure.core/print-method (:condition sif) writer)
+  (.write writer ") { ")
+  (clojure.core/print-method (:consequence sif) writer)
+  (.write writer " } else { ")
+  (clojure.core/print-method (:alternative sif) writer)
+  (.write writer " }"))
 
-;; (defmethod clojure.core/print-method SSequence [s writer]
-;;   (clojure.core/print-method (:first s) writer)
-;;   (.write writer "; ")
-;;   (clojure.core/print-method (:second s) writer))
+(defmethod clojure.core/print-method SSequence [s writer]
+  (clojure.core/print-method (:first s) writer)
+  (.write writer "; ")
+  (clojure.core/print-method (:second s) writer))
 
-;; (defmethod clojure.core/print-method SWhile [swhile writer]
-;;   (.write writer "while (")
-;;   (clojure.core/print-method (:condition swhile) writer)
-;;   (.write writer ") { ")
-;;   (clojure.core/print-method (:body swhile) writer)
-;;   (.write writer " }"))
+(defmethod clojure.core/print-method SWhile [swhile writer]
+  (.write writer "while (")
+  (clojure.core/print-method (:condition swhile) writer)
+  (.write writer ") { ")
+  (clojure.core/print-method (:body swhile) writer)
+  (.write writer " }"))
