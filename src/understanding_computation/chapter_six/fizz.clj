@@ -31,6 +31,48 @@
 
 (def INCREMENT (fn [n] (fn [p] (fn [x] (p ((n p) x))))))
 
+(def SLIDE (fn [p]
+             ((PAIR
+                (RIGHT p))
+              (INCREMENT
+               (RIGHT p)))))
+
+(def DECREMENT (fn [n]
+                 (LEFT
+                  ((n SLIDE)
+                   ((PAIR ZERO) ZERO)))))
+
+(def ADD (fn [m]
+           (fn [n]
+             ((n INCREMENT) m))))
+(def SUBTRACT (fn [m]
+                (fn [n]
+                  ((n DECREMENT) m))))
+(def MULTIPLY (fn [m]
+                (fn [n]
+                  ((n (ADD m)) ZERO))))
+(def POWER (fn [m]
+             (fn [n]
+               ((n (MULTIPLY m)) ONE))))
+
+(def IS_LESS_OR_EQUAL (fn [m]
+                        (fn [n]
+                          (IS_ZERO ((SUBTRACT m) n)))))
+
+(def Z (fn [f]
+         ((fn [x]
+             (f (fn [y]
+                  ((x x) y))))
+          (fn [x]
+            (f (fn [y]
+                 ((x x) y)))))))
+
+(def MOD (Z (fn [f]
+              (fn [m]
+                (fn [n]
+                  (((IF ((IS_LESS_OR_EQUAL n) m))
+                    (fn [x] (((f ((SUBTRACT m) n)) n) x))) m))))))
+
 (defn to-integer [p]
   ((p inc) 0))
 
